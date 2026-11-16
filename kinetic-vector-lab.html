@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kinetic Vector Lab — 30 Character Edition</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #090b10;
+    color: #fff;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+  #kvl-root {
+    width: 100%;
+    max-width: 960px;
+    height: 660px;
+    background: #0d0f14;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    user-select: none;
+    border-radius: 10px;
+    border: 1px solid #1f2636;
+    position: relative;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75);
+  }
+  .char-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    max-height: 175px;
+    overflow-y: auto;
+    padding: 6px;
+    background: #0d0f14;
+    border: 1px solid #2a3245;
+    border-radius: 6px;
+    margin-bottom: 10px;
+  }
+  .char-grid::-webkit-scrollbar { width: 6px; }
+  .char-grid::-webkit-scrollbar-track { background: #0d0f14; }
+  .char-grid::-webkit-scrollbar-thumb { background: #2a3245; border-radius: 3px; }
+  .char-card {
+    background: #141821;
+    border: 2px solid #232a3b;
+    border-radius: 6px;
+    padding: 6px 4px;
+    cursor: pointer;
+    text-align: center;
+    transition: transform 0.1s, border-color 0.15s, background 0.15s;
+  }
+  .char-card:hover {
+    background: #1c2230;
+    transform: translateY(-1px);
+  }
+  .char-card.selected {
+    background: #1b2436;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.25);
+  }
+  .stat-bar-bg {
+    width: 100%;
+    height: 5px;
+    background: #0d0f14;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 2px;
+  }
+  .stat-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+  }
+  button {
+    transition: filter 0.15s, transform 0.08s;
+  }
+  button:hover { filter: brightness(1.1); }
+  button:active { transform: scale(0.98); }
+</style>
+</head>
+<body>
+
+<div id="kvl-root">
+
+  <button onclick="openFullTab()" style="position:absolute; top:12px; right:12px; background:#232a3b; color:#00f0ff; border:1px solid #00f0ff; padding:6px 12px; font-size:12px; font-weight:bold; border-radius:5px; cursor:pointer; z-index:10;">⛶ FULL SCREEN</button>
+
+  <div id="lobby" style="background:#141821; border:2px solid #2a3245; padding:20px 24px; border-radius:10px; text-align:center; max-width:560px; width:92%; box-shadow:0 0 25px rgba(0,0,0,0.6);">
+    <h2 style="margin:0 0 4px 0; font-size:22px; letter-spacing:2px; color:#00f0ff;">KINETIC VECTOR LAB</h2>
+    <p style="margin:0 0 12px 0; font-size:12px; color:#8a99b8;">Elastic Trajectory &amp; Momentum Simulation — Select Your Vector (30 Available)</p>
+
+    <!-- Character Selector -->
+    <div style="text-align:left; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+      <span style="font-size:11px; font-weight:bold; color:#8a99b8; letter-spacing:1px;">ROSTER (30 CHARACTERS)</span>
+      <span id="selectedClassBadge" style="font-size:11px; font-weight:bold; padding:2px 8px; border-radius:4px; background:#0d0f14; color:#00f0ff;">STRIKER</span>
+    </div>
+
+    <div id="charGrid" class="char-grid"></div>
+
+    <!-- Selected Character Preview & Stats -->
+    <div id="charPreview" style="background:#0d0f14; border:1px solid #2a3245; border-radius:6px; padding:10px 12px; margin-bottom:12px; display:flex; align-items:center; gap:12px; text-align:left;">
+      <canvas id="previewCanvas" width="48" height="48" style="background:#141821; border-radius:6px; border:1px solid #2a3245; flex-shrink:0;"></canvas>
+      <div style="flex:1; min-width:0;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <span id="prevName" style="font-size:15px; font-weight:bold; color:#00f0ff;">01. APEX</span>
+          <span id="prevPerk" style="font-size:11px; color:#8a99b8; font-style:italic;">Balanced Kinetic Core</span>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 14px; margin-top:6px; font-size:10px; color:#8a99b8;">
+          <div>SPEED <div class="stat-bar-bg"><div id="barSpeed" class="stat-bar-fill" style="width:60%; background:#00f0ff;"></div></div></div>
+          <div>SHOT POWER <div class="stat-bar-bg"><div id="barPower" class="stat-bar-fill" style="width:60%; background:#ff2a55;"></div></div></div>
+          <div>DASH RECHARGE <div class="stat-bar-bg"><div id="barDash" class="stat-bar-fill" style="width:60%; background:#ffd166;"></div></div></div>
+          <div>DEFLECT RADIUS <div class="stat-bar-bg"><div id="barDeflect" class="stat-bar-fill" style="width:60%; background:#06d6a0;"></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="menuButtons">
+      <div style="display:flex; gap:8px; margin-bottom:8px;">
+        <button onclick="createRoom()" style="background:#00f0ff; color:#0d0f14; border:none; padding:10px; font-size:13px; font-weight:bold; border-radius:6px; cursor:pointer; flex:1;">HOST 1v1 (GET CODE)</button>
+        <button onclick="startSolo()" style="background:#ff2a55; color:#fff; border:none; padding:10px; font-size:13px; font-weight:bold; border-radius:6px; cursor:pointer; flex:1;">SOLO VS. CPU</button>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="joinCodeInput" maxlength="4" placeholder="ENTER 4-LETTER CODE" style="flex:1; box-sizing:border-box; padding:9px; background:#0d0f14; border:2px solid #2a3245; color:#fff; font-size:14px; text-align:center; text-transform:uppercase; letter-spacing:3px; border-radius:6px; font-weight:bold;">
+        <button onclick="joinRoom()" style="background:#232a3b; color:#fff; border:none; padding:9px 16px; font-size:13px; font-weight:bold; border-radius:6px; cursor:pointer;">JOIN 1v1</button>
+      </div>
+    </div>
+
+    <div id="waitingBox" style="display:none;">
+      <p style="margin:0; font-size:13px; color:#8a99b8;">SHARE THIS SESSION CODE:</p>
+      <div id="roomDisplay" style="font-size:32px; font-weight:bold; letter-spacing:6px; color:#00f0ff; margin:10px 0;">----</div>
+      <p style="margin:0; font-size:12px; color:#8a99b8;">Waiting for partner to connect... (Or click below to test solo)</p>
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <button onclick="resetLobby()" style="background:#232a3b; color:#fff; border:none; padding:10px; font-size:13px; font-weight:bold; border-radius:6px; cursor:pointer; flex:1;">CANCEL</button>
+        <button onclick="startSolo()" style="background:#00f0ff; color:#0d0f14; border:none; padding:10px; font-size:13px; font-weight:bold; border-radius:6px; cursor:pointer; flex:1;">LAUNCH VS CPU</button>
+      </div>
+    </div>
+
+    <div id="lobbyStatus" style="font-size:12px; color:#ff2a55; min-height:16px; margin-top:6px;"></div>
+  </div>
+
+  <div id="gameContainer" style="display:none; flex-direction:column; align-items:center; width:100%;">
+    <div style="display:flex; justify-content:space-between; align-items:center; width:780px; max-width:94%; margin-bottom:8px; font-size:16px; font-weight:bold; letter-spacing:1px;">
+      <div id="p1Label" style="color:#00f0ff;">APEX: <span id="p1Score">0</span></div>
+      <div id="status" style="font-size:14px; color:#ffd166;">FIRST TO 5 WINS</div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div id="p2Label" style="color:#ff2a55;">CPU: <span id="p2Score">0</span></div>
+        <button onclick="exitToLobby()" style="background:#232a3b; color:#8a99b8; border:1px solid #38435c; padding:4px 8px; font-size:11px; border-radius:4px; cursor:pointer;">LOBBY</button>
+      </div>
+    </div>
+    <canvas id="game" width="780" height="480" tabindex="0" style="background:#141821; border:3px solid #2a3245; max-width:94%; cursor:crosshair; outline:none; border-radius:6px;"></canvas>
+    <div style="margin-top:10px; font-size:13px; color:#8a99b8; text-align:center;">
+      <b>W A S D / ARROWS</b> Move &nbsp;|&nbsp; <b>LEFT CLICK</b> Launch / Recall &nbsp;|&nbsp; <b>SPACE</b> Dash &nbsp;|&nbsp; <b>E / RIGHT CLICK</b> Deflect
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ==========================================
+// 30 PLAYABLE CHARACTERS (VECTORS)
+// ==========================================
+const CHARACTERS = [
+  { id: 1,  name: "APEX",       role: "ALL-ROUNDER", color: "#00f0ff", shape: "circle",   speed: 4.5, shotSpeed: 11.5, dashCd: 110, deflectRad: 44, perk: "Balanced Kinetic Core" },
+  { id: 2,  name: "BLITZ",      role: "SPEEDSTER",   color: "#ffd166", shape: "triangle", speed: 5.8, shotSpeed: 10.5, dashCd: 80,  deflectRad: 38, perk: "Hyper-Thruster Drive" },
+  { id: 3,  name: "BASTION",    role: "DEFENDER",    color: "#06d6a0", shape: "square",   speed: 3.6, shotSpeed: 11.0, dashCd: 130, deflectRad: 62, perk: "Wide-Field Aegis Shield" },
+  { id: 4,  name: "RAILGUN",    role: "SNIPER",      color: "#ff2a55", shape: "diamond",  speed: 4.1, shotSpeed: 15.5, dashCd: 120, deflectRad: 36, perk: "Supersonic Orb Velocity" },
+  { id: 5,  name: "PHANTOM",    role: "DASHER",      color: "#b5179e", shape: "triangle", speed: 5.0, shotSpeed: 11.0, dashCd: 65,  deflectRad: 40, perk: "Phase-Shift Rapid Dash" },
+  { id: 6,  name: "TITAN",      role: "HEAVY",       color: "#f77f00", shape: "hexagon",  speed: 3.4, shotSpeed: 14.0, dashCd: 140, deflectRad: 56, perk: "High-Mass Impact Frame" },
+  { id: 7,  name: "NOVA",       role: "STRIKER",     color: "#ff9f1c", shape: "star",     speed: 4.8, shotSpeed: 13.0, dashCd: 105, deflectRad: 42, perk: "Solar Flare Discharge" },
+  { id: 8,  name: "SPECTRE",    role: "TRICKSTER",   color: "#7209b7", shape: "diamond",  speed: 5.2, shotSpeed: 11.2, dashCd: 75,  deflectRad: 45, perk: "Shadow Step Mobility" },
+  { id: 9,  name: "AEGIS",      role: "GUARDIAN",    color: "#4cc9f0", shape: "hexagon",  speed: 3.8, shotSpeed: 10.8, dashCd: 115, deflectRad: 64, perk: "Maximum Deflect Perimeter" },
+  { id: 10, name: "VORTEX",     role: "CONTROLLER",  color: "#4361ee", shape: "circle",   speed: 4.4, shotSpeed: 12.2, dashCd: 95,  deflectRad: 52, perk: "Gravity Well Capture" },
+  { id: 11, name: "IGNIS",      role: "AGGRESSOR",   color: "#e63946", shape: "triangle", speed: 4.9, shotSpeed: 13.8, dashCd: 100, deflectRad: 38, perk: "Thermal Overdrive" },
+  { id: 12, name: "GLACIER",    role: "ANCHOR",      color: "#a8dadc", shape: "square",   speed: 3.7, shotSpeed: 11.5, dashCd: 125, deflectRad: 60, perk: "Cryo-Wall Barrier" },
+  { id: 13, name: "VOLT",       role: "SKIRMISHER",  color: "#fee440", shape: "diamond",  speed: 5.6, shotSpeed: 11.8, dashCd: 85,  deflectRad: 40, perk: "Arc-Lightning Reflexes" },
+  { id: 14, name: "CHRONO",     role: "TACTICIAN",   color: "#00bbf9", shape: "star",     speed: 4.6, shotSpeed: 12.0, dashCd: 70,  deflectRad: 48, perk: "Temporal Cooldown Loop" },
+  { id: 15, name: "OBSIDIAN",   role: "JUGGERNAUT",  color: "#8d99ae", shape: "square",   speed: 3.5, shotSpeed: 13.5, dashCd: 135, deflectRad: 58, perk: "Monolith Armor Plating" },
+  { id: 16, name: "ZEPHYR",     role: "RUNNER",      color: "#80ffdb", shape: "circle",   speed: 6.0, shotSpeed: 10.0, dashCd: 85,  deflectRad: 36, perk: "Peak Aerodynamic Velocity" },
+  { id: 17, name: "PULSE",      role: "DISRUPTOR",   color: "#f15bb5", shape: "hexagon",  speed: 4.5, shotSpeed: 12.5, dashCd: 95,  deflectRad: 50, perk: "Sonic Repulsor Ring" },
+  { id: 18, name: "SOLARIS",    role: "CANNON",      color: "#ffbe0b", shape: "star",     speed: 4.0, shotSpeed: 15.0, dashCd: 125, deflectRad: 40, perk: "Helios Beam Launcher" },
+  { id: 19, name: "ECLIPSE",    role: "ASSASSIN",    color: "#9b5de5", shape: "triangle", speed: 5.3, shotSpeed: 13.2, dashCd: 85,  deflectRad: 37, perk: "Umbral Ambush Vector" },
+  { id: 20, name: "COBALT",     role: "SENTINEL",    color: "#3a86ff", shape: "hexagon",  speed: 4.2, shotSpeed: 11.4, dashCd: 105, deflectRad: 55, perk: "Tactical Grid Lock" },
+  { id: 21, name: "VENOM",      role: "STRIKER",     color: "#38b000", shape: "diamond",  speed: 5.1, shotSpeed: 12.8, dashCd: 90,  deflectRad: 41, perk: "Corrosive Spin Shot" },
+  { id: 22, name: "QUASAR",     role: "ARTILLERY",   color: "#ff006e", shape: "star",     speed: 3.9, shotSpeed: 15.2, dashCd: 130, deflectRad: 42, perk: "Singularity Rail Launch" },
+  { id: 23, name: "MIRAGE",     role: "DUELIST",     color: "#ff758f", shape: "circle",   speed: 5.4, shotSpeed: 11.6, dashCd: 72,  deflectRad: 44, perk: "Afterimage Feint Dash" },
+  { id: 24, name: "FORGE",      role: "BRUISER",     color: "#fb5607", shape: "square",   speed: 3.9, shotSpeed: 13.6, dashCd: 115, deflectRad: 53, perk: "Molten Core Strike" },
+  { id: 25, name: "PRISM",      role: "REFLECTOR",   color: "#c77dff", shape: "diamond",  speed: 4.4, shotSpeed: 11.8, dashCd: 100, deflectRad: 61, perk: "Refraction Mirror Field" },
+  { id: 26, name: "STRIDER",    role: "SCOUT",       color: "#52b788", shape: "triangle", speed: 5.7, shotSpeed: 10.8, dashCd: 78,  deflectRad: 39, perk: "Recon Vector Thrusters" },
+  { id: 27, name: "OMEGA",      role: "OVERLORD",    color: "#d90429", shape: "hexagon",  speed: 4.3, shotSpeed: 14.2, dashCd: 110, deflectRad: 49, perk: "Apex Dominion Protocol" },
+  { id: 28, name: "HALO",       role: "SUPPORT",     color: "#90e0ef", shape: "circle",   speed: 4.6, shotSpeed: 11.0, dashCd: 90,  deflectRad: 57, perk: "Orbital Catch Aura" },
+  { id: 29, name: "ZENITH",     role: "MASTER",      color: "#f8961e", shape: "star",     speed: 4.9, shotSpeed: 13.4, dashCd: 92,  deflectRad: 47, perk: "Harmonic Momentum Core" },
+  { id: 30, name: "ZERO",       role: "PROTOTYPE",   color: "#ffffff", shape: "diamond",  speed: 5.2, shotSpeed: 13.8, dashCd: 82,  deflectRad: 46, perk: "Unstable Quantum Drive" }
+];
+
+let selectedChar = CHARACTERS[0];
+let cpuChar = CHARACTERS[3];
+
+function drawVectorShape(ctx, shape, x, y, r, color, strokeColor = "#ffffff") {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = color;
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+
+  if (shape === "circle") {
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+  } else if (shape === "square") {
+    ctx.rect(-r * 0.85, -r * 0.85, r * 1.7, r * 1.7);
+  } else if (shape === "diamond") {
+    ctx.moveTo(0, -r * 1.15);
+    ctx.lineTo(r * 1.05, 0);
+    ctx.lineTo(0, r * 1.15);
+    ctx.lineTo(-r * 1.05, 0);
+    ctx.closePath();
+  } else if (shape === "triangle") {
+    ctx.moveTo(0, -r * 1.15);
+    ctx.lineTo(r * 1.05, r * 0.85);
+    ctx.lineTo(-r * 1.05, r * 0.85);
+    ctx.closePath();
+  } else if (shape === "hexagon") {
+    for (let i = 0; i < 6; i++) {
+      const ang = (Math.PI / 3) * i - Math.PI / 6;
+      const px = Math.cos(ang) * r;
+      const py = Math.sin(ang) * r;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  } else if (shape === "star") {
+    for (let i = 0; i < 10; i++) {
+      const rad = i % 2 === 0 ? r * 1.15 : r * 0.55;
+      const ang = (Math.PI / 5) * i - Math.PI / 2;
+      const px = Math.cos(ang) * rad;
+      const py = Math.sin(ang) * rad;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  }
+
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function initRosterUI() {
+  const grid = document.getElementById("charGrid");
+  grid.innerHTML = "";
+  CHARACTERS.forEach((c) => {
+    const card = document.createElement("div");
+    card.className = "char-card" + (c.id === selectedChar.id ? " selected" : "");
+    card.style.borderColor = c.id === selectedChar.id ? c.color : "#232a3b";
+    card.onclick = () => selectCharacter(c);
+
+    const miniCanvas = document.createElement("canvas");
+    miniCanvas.width = 28;
+    miniCanvas.height = 28;
+    const mctx = miniCanvas.getContext("2d");
+    drawVectorShape(mctx, c.shape, 14, 14, 9, c.color);
+
+    const label = document.createElement("div");
+    label.style.fontSize = "10px";
+    label.style.fontWeight = "bold";
+    label.style.color = c.color;
+    label.style.marginTop = "2px";
+    label.style.whiteSpace = "nowrap";
+    label.style.overflow = "hidden";
+    label.style.textOverflow = "ellipsis";
+    label.textContent = `${String(c.id).padStart(2, '0')}. ${c.name}`;
+
+    card.appendChild(miniCanvas);
+    card.appendChild(label);
+    grid.appendChild(card);
+  });
+  updatePreview();
+}
+
+function selectCharacter(c) {
+  selectedChar = c;
+  initRosterUI();
+}
+
+function updatePreview() {
+  const c = selectedChar;
+  document.getElementById("prevName").textContent = `${String(c.id).padStart(2, '0')}. ${c.name}`;
+  document.getElementById("prevName").style.color = c.color;
+  document.getElementById("prevPerk").textContent = c.perk;
+
+  const badge = document.getElementById("selectedClassBadge");
+  badge.textContent = c.role;
+  badge.style.color = c.color;
+  badge.style.border = `1px solid ${c.color}`;
+
+  // Normalize stats to percentages
+  const speedPct = Math.min(100, Math.max(20, ((c.speed - 3.0) / 3.2) * 100));
+  const powerPct = Math.min(100, Math.max(20, ((c.shotSpeed - 9.5) / 6.5) * 100));
+  const dashPct  = Math.min(100, Math.max(20, ((155 - c.dashCd) / 95) * 100));
+  const defPct   = Math.min(100, Math.max(20, ((c.deflectRad - 32) / 34) * 100));
+
+  document.getElementById("barSpeed").style.width = speedPct + "%";
+  document.getElementById("barPower").style.width = powerPct + "%";
+  document.getElementById("barDash").style.width = dashPct + "%";
+  document.getElementById("barDeflect").style.width = defPct + "%";
+
+  const pCanvas = document.getElementById("previewCanvas");
+  const pCtx = pCanvas.getContext("2d");
+  pCtx.clearRect(0, 0, 48, 48);
+  drawVectorShape(pCtx, c.shape, 24, 24, 15, c.color);
+}
+
+// ==========================================
+// FULLSCREEN & LOBBY NAVIGATION
+// ==========================================
+function openFullTab() {
+  const root = document.getElementById('kvl-root');
+  if (root.requestFullscreen) {
+    root.requestFullscreen().catch(() => popOutWindow());
+  } else {
+    popOutWindow();
+  }
+}
+
+function popOutWindow() {
+  const win = window.open('about:blank', '_blank');
+  if (!win) {
+    alert("Allow pop-ups in the top right of your address bar to open Full Screen!");
+    return;
+  }
+  const fullHTML = '<!DOCTYPE html><html><head><title>Kinetic Vector Lab</title><style>body{margin:0;background:#0d0f14;overflow:hidden;display:flex;align-items:center;justify-content:center;height:100vh;}#kvl-root{height:100vh !important;max-width:100% !important;}</style></head><body>' + document.body.innerHTML + '</body></html>';
+  win.document.open();
+  win.document.write(fullHTML);
+  win.document.close();
+}
+
+function createRoom() {
+  const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+  document.getElementById('menuButtons').style.display = 'none';
+  document.getElementById('waitingBox').style.display = 'block';
+  document.getElementById('roomDisplay').textContent = code;
+  document.getElementById('lobbyStatus').textContent = 'Local session created. Connect WebSocket/PeerJS or launch vs CPU.';
+}
+
+function joinRoom() {
+  const code = document.getElementById('joinCodeInput').value.trim().toUpperCase();
+  if (code.length < 4) {
+    document.getElementById('lobbyStatus').textContent = 'Please enter a valid 4-character session code.';
+    return;
+  }
+  document.getElementById('lobbyStatus').textContent = `No live signaling server detected for room [${code}]. Starting Solo vs CPU...`;
+  setTimeout(startSolo, 900);
+}
+
+function resetLobby() {
+  document.getElementById('menuButtons').style.display = 'block';
+  document.getElementById('waitingBox').style.display = 'none';
+  document.getElementById('lobbyStatus').textContent = '';
+}
+
+function exitToLobby() {
+  gameRunning = false;
+  cancelAnimationFrame(animId);
+  document.getElementById('gameContainer').style.display = 'none';
+  document.getElementById('lobby').style.display = 'block';
+  resetLobby();
+}
+
+// ==========================================
+// KINETIC VECTOR LAB PHYSICS & GAME ENGINE
+// ==========================================
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let gameRunning = false;
+let animId = null;
+let p1Score = 0;
+let p2Score = 0;
+const WIN_SCORE = 5;
+
+const keys = {};
+const mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+let particles = [];
+
+let p1 = {};
+let p2 = {};
+let orb = {};
+
+function startSolo() {
+  // Pick a random CPU character different from P1
+  const pool = CHARACTERS.filter(c => c.id !== selectedChar.id);
+  cpuChar = pool[Math.floor(Math.random() * pool.length)];
+
+  p1Score = 0;
+  p2Score = 0;
+  document.getElementById("p1Score").textContent = "0";
+  document.getElementById("p2Score").textContent = "0";
+
+  const p1Label = document.getElementById("p1Label");
+  p1Label.style.color = selectedChar.color;
+  p1Label.innerHTML = `${selectedChar.name}: <span id="p1Score">0</span>`;
+
+  const p2Label = document.getElementById("p2Label");
+  p2Label.style.color = cpuChar.color;
+  p2Label.innerHTML = `${cpuChar.name} (CPU): <span id="p2Score">0</span>`;
+
+  document.getElementById("status").textContent = "FIRST TO 5 WINS";
+  document.getElementById("lobby").style.display = "none";
+  document.getElementById("gameContainer").style.display = "flex";
+  canvas.focus();
+
+  resetRound(1);
+  gameRunning = true;
+  if (animId) cancelAnimationFrame(animId);
+  gameLoop();
+}
+
+function resetRound(holder = 1) {
+  particles = [];
+  p1 = {
+    x: 130,
+    y: canvas.height / 2,
+    vx: 0,
+    vy: 0,
+    r: 18,
+    char: selectedChar,
+    dashTimer: 0,
+    dashActive: 0,
+    deflectTimer: 0,
+    deflectCooldown: 0
+  };
+  p2 = {
+    x: canvas.width - 130,
+    y: canvas.height / 2,
+    vx: 0,
+    vy: 0,
+    r: 18,
+    char: cpuChar,
+    dashTimer: 0,
+    dashActive: 0,
+    deflectTimer: 0,
+    deflectCooldown: 0,
+    aiHoldTimer: 45
+  };
+  orb = {
+    x: holder === 1 ? p1.x + 28 : p2.x - 28,
+    y: canvas.height / 2,
+    vx: 0,
+    vy: 0,
+    r: 9,
+    owner: holder, // 0 = free, 1 = p1, 2 = p2
+    lastHitBy: holder,
+    trail: []
+  };
+}
+
+function spawnParticles(x, y, color, count = 14) {
+  for (let i = 0; i < count; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const spd = 1 + Math.random() * 4.5;
+    particles.push({
+      x, y,
+      vx: Math.cos(ang) * spd,
+      vy: Math.sin(ang) * spd,
+      life: 20 + Math.random() * 15,
+      maxLife: 35,
+      color
+    });
+  }
+}
+
+function triggerDash(player, dirX, dirY) {
+  if (player.dashTimer > 0) return;
+  const len = Math.hypot(dirX, dirY);
+  if (len === 0) return;
+  player.vx = (dirX / len) * (player.char.speed * 2.8);
+  player.vy = (dirY / len) * (player.char.speed * 2.8);
+  player.dashActive = 10;
+  player.dashTimer = player.char.dashCd;
+  spawnParticles(player.x, player.y, player.char.color, 10);
+}
+
+function triggerDeflect(player) {
+  if (player.deflectCooldown > 0) return;
+  player.deflectTimer = 14;
+  player.deflectCooldown = 48;
+  spawnParticles(player.x, player.y, player.char.color, 8);
+}
+
+function launchOrRecallP1() {
+  if (!gameRunning) return;
+  if (orb.owner === 1) {
+    // Launch towards mouse
+    const dx = mouse.x - p1.x;
+    const dy = mouse.y - p1.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    orb.owner = 0;
+    orb.lastHitBy = 1;
+    orb.vx = (dx / dist) * p1.char.shotSpeed;
+    orb.vy = (dy / dist) * p1.char.shotSpeed;
+    spawnParticles(orb.x, orb.y, p1.char.color, 12);
+  } else if (orb.owner === 0 && orb.lastHitBy === 1) {
+    // Magnetic recall pull slightly towards P1
+    const dx = p1.x - orb.x;
+    const dy = p1.y - orb.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    orb.vx += (dx / dist) * 2.2;
+    orb.vy += (dy / dist) * 2.2;
+    spawnParticles(orb.x, orb.y, "#ffffff", 5);
+  }
+}
+
+// Input Listeners
+window.addEventListener("keydown", (e) => {
+  keys[e.code] = true;
+  if (!gameRunning) return;
+  if (e.code === "Space") {
+    e.preventDefault();
+    let dx = 0, dy = 0;
+    if (keys["KeyW"] || keys["ArrowUp"]) dy -= 1;
+    if (keys["KeyS"] || keys["ArrowDown"]) dy += 1;
+    if (keys["KeyA"] || keys["ArrowLeft"]) dx -= 1;
+    if (keys["KeyD"] || keys["ArrowRight"]) dx += 1;
+    if (dx === 0 && dy === 0) dx = 1;
+    triggerDash(p1, dx, dy);
+  }
+  if (e.code === "KeyE") {
+    triggerDeflect(p1);
+  }
+});
+
+window.addEventListener("keyup", (e) => {
+  keys[e.code] = false;
+});
+
+canvas.addEventListener("mousemove", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  mouse.x = (e.clientX - rect.left) * scaleX;
+  mouse.y = (e.clientY - rect.top) * scaleY;
+});
+
+canvas.addEventListener("mousedown", (e) => {
+  if (!gameRunning) return;
+  if (e.button === 0) launchOrRecallP1();
+  if (e.button === 2) triggerDeflect(p1);
+});
+
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+function constrainPlayer(p, isLeft) {
+  const mid = canvas.width / 2;
+  const minX = isLeft ? p.r + 12 : mid + p.r + 6;
+  const maxX = isLeft ? mid - p.r - 6 : canvas.width - p.r - 12;
+  if (p.x < minX) { p.x = minX; p.vx = 0; }
+  if (p.x > maxX) { p.x = maxX; p.vx = 0; }
+  if (p.y < p.r + 12) { p.y = p.r + 12; p.vy = 0; }
+  if (p.y > canvas.height - p.r - 12) { p.y = canvas.height - p.r - 12; p.vy = 0; }
+}
+
+function updateCPU() {
+  if (p2.dashTimer > 0) p2.dashTimer--;
+  if (p2.dashActive > 0) p2.dashActive--;
+  if (p2.deflectTimer > 0) p2.deflectTimer--;
+  if (p2.deflectCooldown > 0) p2.deflectCooldown--;
+
+  let targetX = canvas.width - 140;
+  let targetY = canvas.height / 2;
+
+  if (orb.owner === 2) {
+    // Move slightly and shoot at P1 with slight angle variation
+    targetY = p1.y > canvas.height / 2 ? 120 : canvas.height - 120;
+    p2.aiHoldTimer--;
+    if (p2.aiHoldTimer <= 0) {
+      const aimY = p1.y + (Math.random() - 0.5) * 140;
+      const dx = p1.x - p2.x;
+      const dy = aimY - p2.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      orb.owner = 0;
+      orb.lastHitBy = 2;
+      orb.vx = (dx / dist) * p2.char.shotSpeed;
+      orb.vy = (dy / dist) * p2.char.shotSpeed;
+      spawnParticles(orb.x, orb.y, p2.char.color, 12);
+    }
+  } else if (orb.owner === 0) {
+    targetY = orb.y;
+    targetX = orb.vx > 0 ? canvas.width - 110 : canvas.width - 180;
+
+    // Deflect if orb approaches fast
+    const distToOrb = Math.hypot(orb.x - p2.x, orb.y - p2.y);
+    if (orb.vx > 0 && distToOrb < p2.char.deflectRad + 15 && p2.deflectCooldown === 0) {
+      triggerDeflect(p2);
+    }
+  }
+
+  if (p2.dashActive <= 0) {
+    const dy = targetY - p2.y;
+    const dx = targetX - p2.x;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 6) {
+      p2.vx = (dx / dist) * (p2.char.speed * 0.88);
+      p2.vy = (dy / dist) * (p2.char.speed * 0.88);
+    } else {
+      p2.vx *= 0.7;
+      p2.vy *= 0.7;
+    }
+  }
+
+  p2.x += p2.vx;
+  p2.y += p2.vy;
+  constrainPlayer(p2, false);
+}
+
+function update() {
+  // P1 Timers
+  if (p1.dashTimer > 0) p1.dashTimer--;
+  if (p1.dashActive > 0) p1.dashActive--;
+  if (p1.deflectTimer > 0) p1.deflectTimer--;
+  if (p1.deflectCooldown > 0) p1.deflectCooldown--;
+
+  // P1 Movement
+  if (p1.dashActive <= 0) {
+    let mx = 0, my = 0;
+    if (keys["KeyW"] || keys["ArrowUp"]) my -= 1;
+    if (keys["KeyS"] || keys["ArrowDown"]) my += 1;
+    if (keys["KeyA"] || keys["ArrowLeft"]) mx -= 1;
+    if (keys["KeyD"] || keys["ArrowRight"]) mx += 1;
+    const len = Math.hypot(mx, my);
+    if (len > 0) {
+      p1.vx = (mx / len) * p1.char.speed;
+      p1.vy = (my / len) * p1.char.speed;
+    } else {
+      p1.vx *= 0.75;
+      p1.vy *= 0.75;
+    }
+  }
+  p1.x += p1.vx;
+  p1.y += p1.vy;
+  constrainPlayer(p1, true);
+
+  updateCPU();
+
+  // Orb Physics
+  if (orb.owner === 1) {
+    const ang = Math.atan2(mouse.y - p1.y, mouse.x - p1.x);
+    orb.x = p1.x + Math.cos(ang) * 28;
+    orb.y = p1.y + Math.sin(ang) * 28;
+    orb.trail = [];
+  } else if (orb.owner === 2) {
+    orb.x = p2.x - 28;
+    orb.y = p2.y;
+    orb.trail = [];
+  } else {
+    orb.trail.push({ x: orb.x, y: orb.y });
+    if (orb.trail.length > 14) orb.trail.shift();
+
+    orb.x += orb.vx;
+    orb.y += orb.vy;
+
+    // Top / Bottom Wall Bounce
+    if (orb.y - orb.r < 8) {
+      orb.y = 8 + orb.r;
+      orb.vy *= -1;
+      spawnParticles(orb.x, orb.y, "#00f0ff", 6);
+    } else if (orb.y + orb.r > canvas.height - 8) {
+      orb.y = canvas.height - 8 - orb.r;
+      orb.vy *= -1;
+      spawnParticles(orb.x, orb.y, "#00f0ff", 6);
+    }
+
+    // Check Deflections & Player Hits
+    [p1, p2].forEach((pl, idx) => {
+      const pNum = idx + 1;
+      const dist = Math.hypot(orb.x - pl.x, orb.y - pl.y);
+
+      // Active Deflect Shield
+      if (pl.deflectTimer > 0 && dist < pl.char.deflectRad + orb.r) {
+        const nx = (orb.x - pl.x) / (dist || 1);
+        const ny = (orb.y - pl.y) / (dist || 1);
+        const boostedSpeed = Math.min(19, Math.hypot(orb.vx, orb.vy) * 1.18 + 1.5);
+        orb.vx = nx * boostedSpeed;
+        orb.vy = ny * boostedSpeed;
+        orb.lastHitBy = pNum;
+        orb.x = pl.x + nx * (pl.char.deflectRad + orb.r + 3);
+        orb.y = pl.y + ny * (pl.char.deflectRad + orb.r + 3);
+        spawnParticles(orb.x, orb.y, pl.char.color, 18);
+        return;
+      }
+
+      // Direct Body Hit
+      if (dist < pl.r + orb.r) {
+        if (orb.lastHitBy !== pNum) {
+          // Point scored against this player!
+          spawnParticles(pl.x, pl.y, pl.char.color, 30);
+          if (pNum === 1) {
+            p2Score++;
+            document.getElementById("p2Score").textContent = p2Score;
+            checkWin() || resetRound(1);
+          } else {
+            p1Score++;
+            document.getElementById("p1Score").textContent = p1Score;
+            checkWin() || resetRound(2);
+          }
+        } else {
+          // Catch own slow orb
+          orb.owner = pNum;
+          if (pNum === 2) p2.aiHoldTimer = 40;
+        }
+      }
+    });
+
+    // Goal Wall Scoring (Past Left or Right Edge)
+    if (orb.x - orb.r < 6) {
+      p2Score++;
+      document.getElementById("p2Score").textContent = p2Score;
+      spawnParticles(orb.x, orb.y, p2.char.color, 25);
+      checkWin() || resetRound(1);
+    } else if (orb.x + orb.r > canvas.width - 6) {
+      p1Score++;
+      document.getElementById("p1Score").textContent = p1Score;
+      spawnParticles(orb.x, orb.y, p1.char.color, 25);
+      checkWin() || resetRound(2);
+    }
+  }
+
+  // Update Particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const pt = particles[i];
+    pt.x += pt.vx;
+    pt.y += pt.vy;
+    pt.life--;
+    if (pt.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function checkWin() {
+  if (p1Score >= WIN_SCORE || p2Score >= WIN_SCORE) {
+    gameRunning = false;
+    const winner = p1Score >= WIN_SCORE ? `${selectedChar.name} WINS!` : `${cpuChar.name} (CPU) WINS!`;
+    document.getElementById("status").textContent = winner;
+    setTimeout(() => {
+      if (!gameRunning) {
+        document.getElementById("status").textContent = "CLICK LOBBY TO CHANGE VECTOR";
+      }
+    }, 2000);
+    return true;
+  }
+  return false;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Arena Grid & Center Divider
+  ctx.strokeStyle = "#1c2230";
+  ctx.lineWidth = 1;
+  for (let x = 0; x < canvas.width; x += 30) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+  }
+  for (let y = 0; y < canvas.height; y += 30) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+
+  // Center Line
+  ctx.strokeStyle = "#2a3245";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 8]);
+  ctx.beginPath();
+  ctx.moveTo(canvas.width / 2, 0);
+  ctx.lineTo(canvas.width / 2, canvas.height);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Goal Zones Glow
+  ctx.fillStyle = "rgba(0, 240, 255, 0.08)";
+  ctx.fillRect(0, 0, 8, canvas.height);
+  ctx.fillStyle = "rgba(255, 42, 85, 0.08)";
+  ctx.fillRect(canvas.width - 8, 0, 8, canvas.height);
+
+  // Aim Line for P1 when holding orb
+  if (orb.owner === 1) {
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(orb.x, orb.y);
+    ctx.lineTo(mouse.x, mouse.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Draw Deflect Shields
+  [p1, p2].forEach((pl) => {
+    if (pl.deflectTimer > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(pl.x, pl.y, pl.char.deflectRad, 0, Math.PI * 2);
+      ctx.strokeStyle = pl.char.color;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.fillStyle = pl.char.color + "28";
+      ctx.fill();
+      ctx.restore();
+    }
+  });
+
+  // Draw Players
+  drawVectorShape(ctx, p1.char.shape, p1.x, p1.y, p1.r, p1.char.color);
+  drawVectorShape(ctx, p2.char.shape, p2.x, p2.y, p2.r, p2.char.color);
+
+  // Dash Cooldown Ring on P1
+  if (p1.dashTimer > 0) {
+    const pct = 1 - p1.dashTimer / p1.char.dashCd;
+    ctx.beginPath();
+    ctx.arc(p1.x, p1.y, p1.r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pct);
+    ctx.strokeStyle = "#ffd166";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  // Draw Orb Trail
+  orb.trail.forEach((t, i) => {
+    const alpha = (i / orb.trail.length) * 0.5;
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, orb.r * (i / orb.trail.length), 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Draw Kinetic Orb
+  ctx.save();
+  ctx.shadowBlur = 14;
+  ctx.shadowColor = orb.lastHitBy === 1 ? p1.char.color : p2.char.color;
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(orb.x, orb.y, orb.r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Draw Particles
+  particles.forEach((pt) => {
+    ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife);
+    ctx.fillStyle = pt.color;
+    ctx.fillRect(pt.x - 2, pt.y - 2, 4, 4);
+  });
+  ctx.globalAlpha = 1;
+}
+
+function gameLoop() {
+  if (!gameRunning) return;
+  update();
+  draw();
+  animId = requestAnimationFrame(gameLoop);
+}
+
+// Initialize the 30-character lobby grid on load
+initRosterUI();
+</script>
+</body>
+</html>
